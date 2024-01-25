@@ -79,7 +79,7 @@ const SMSSender = () => {
     const { accountSid, authToken, messagingSid, twilioNumber } = formData;
 
     // Validate input fields
-    if (!accountSid || !authToken || !messagingSid || !twilioNumber) {
+    if (!accountSid || !authToken || !twilioNumber) {
       toast.error("Please fill in all fields");
       return;
     }
@@ -161,7 +161,7 @@ const SMSSender = () => {
   };
 
   const updateTwilioConfiguration = (id, updatedConfig) => {
-    const updatedConfigurations = twilioConfigurations.map((config) =>
+    const updatedConfigurations = twilioConfigurations?.map((config) =>
       config.id === id ? { ...config, ...updatedConfig } : config
     );
 
@@ -225,9 +225,9 @@ const SMSSender = () => {
 
         // Handle only CSV and TXT file types
         if (file.name.endsWith(".csv") || file.type === "text/csv") {
-          numberArray = content.split("\n").map((number) => number.trim());
+          numberArray = content.split("\n")?.map((number) => number.trim());
         } else if (file.name.endsWith(".txt") || file.type === "text/plain") {
-          numberArray = content.split("\n").map((number) => number.trim());
+          numberArray = content.split("\n")?.map((number) => number.trim());
         } else {
           toast.error(
             "Unsupported file type. Please upload only CSV or TXT files."
@@ -235,32 +235,15 @@ const SMSSender = () => {
           return;
         }
 
-        // Validate sms numbers before setting the state
-        if (validateNumbers(numberArray)) {
-          setNumbers(numberArray);
-          setSelectedFile(file);
-
-          const numberCount = numberArray?.length;
-          setNumberCount(numberCount);
-        } else {
-          toast.error("Invalid numbers/carriers found in this file.");
-        }
+        setNumbers(numberArray);
+        setSelectedFile(file);
+        
+        const numberCount = numberArray?.length;
+        setNumberCount(numberCount);
       };
 
       reader.readAsText(file);
     }
-  };
-
-  // Function to validate phone numbers
-  const validateNumbers = (numbers) => {
-    const numberRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-    for (const number of numbers) {
-      if (!numberRegex.test(number)) {
-        return false;
-      }
-    }
-    return true;
   };
 
   const handleRemoveFile = () => {
@@ -345,7 +328,13 @@ const SMSSender = () => {
         smsMessage: smsMessages,
       };
 
-      const res = await request.post("/sms", newSMS);
+      let res;
+
+      if (twilioConfigurations[0].messagingSid?.trim() === "") {
+        res = await request.post("/sms", newSMS);
+      } else {
+        res = await request.post("/messagingSid", newSMS);
+      }
 
       //console.log(res.data.results);
 
@@ -370,16 +359,41 @@ const SMSSender = () => {
       const errorMessage = res.data.results[0]?.error;
 
       if (
-        errorMessage?.includes(
-          "SSL routines:ssl3_get_record:wrong version number"
-        )
+        errorMessage?.includes("Twilio error 10001")
       ) {
-        toast.error(`You need to verify your Twilio account.`, {
+        toast.error(`AccountSid or AuthToken is invalid.`, {
           duration: 90000,
         });
-      } else if (errorMessage?.includes("Twilio error: 452")) {
+      } else if (errorMessage?.includes("Twilio error 20001")) {
         toast.error(
-          "Twilio account has reached its usage limit. Please try again later.",
+          "Invalid 'From' phone number.",
+          {
+            duration: 90000,
+          }
+        );
+      } else if (errorMessage?.includes("Twilio error 21408")) {
+        toast.error(
+          "Permission to send an SMS has not been enabled.",
+          {
+            duration: 90000,
+          }
+        );
+      } else if (errorMessage?.includes("Twilio error 60400")) {
+        toast.error(
+          "Message delivery failure.",
+          {
+            duration: 90000,
+          }
+        );
+      } else if (errorMessage?.includes("Twilio error 60200")) {
+        toast.error(
+          "Sending rate limit exceeded.",
+          {
+            duration: 90000,
+          }
+        );
+      } else if (errorMessage?.includes("Trial accounts cannot send messages to unverified numbers")) {
+        toast.error("Failed to send SMS. Twilio trial accounts cannot send messages to unverified numbers. Verify the numbers in your your list or or purchase a Twilio number to send messages to unverified numbers.",
           {
             duration: 90000,
           }
@@ -411,7 +425,7 @@ const SMSSender = () => {
     if (
       JSON.stringify(smsResponse) !== JSON.stringify(prevSMSResponse.current)
     ) {
-      const timeoutIds = smsResponse.map((_, index) => {
+      const timeoutIds = smsResponse?.map((_, index) => {
         return setTimeout(() => {
           setSenderResponse((prevSenderResponse) => [
             ...prevSenderResponse,
@@ -424,7 +438,7 @@ const SMSSender = () => {
       prevSMSResponse.current = smsResponse;
 
       return () => {
-        timeoutIds.forEach((timeoutId) => clearTimeout(timeoutId));
+        timeoutIds?.forEach((timeoutId) => clearTimeout(timeoutId));
       };
     }
   }, [smsResponse]);
@@ -604,7 +618,7 @@ const SMSSender = () => {
                   </thead>
                   <tbody>
                     {searchTerm === ""
-                      ? twilioConfigurations.map((row, index) => (
+                      ? twilioConfigurations?.map((row, index) => (
                           <tr key={index} className="border-b">
                             <th
                               scope="row"
@@ -642,7 +656,7 @@ const SMSSender = () => {
                             </td>
                           </tr>
                         ))
-                      : filteredRows.map((row, index) => (
+                      : filteredRows?.map((row, index) => (
                           <tr key={index} className="border-b ">
                             {/* Render your table cells based on the row data */}
                             <th
@@ -1088,7 +1102,7 @@ const SMSSender = () => {
                           className="block mb-2 text-base font-medium text-gray-900"
                           htmlFor="file_input"
                         >
-                          Upload Leads (.txt or .csv)
+                          Upload numbers (.txt or .csv)
                         </label>
                         <input
                           className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5"
@@ -1144,7 +1158,7 @@ const SMSSender = () => {
                                   <div className="">
                                     <div className="flex flex-wrap text-xs text-gray-900">
                                       {numbers &&
-                                        numbers.map((number, index) => (
+                                        numbers?.map((number, index) => (
                                           <div
                                             key={index}
                                             className="mb-2 mr-2"
@@ -1247,8 +1261,9 @@ const SMSSender = () => {
                               </button>
                               <div id="accordion-flush">
                                 {smsMessages
+                                  .slice() 
                                   .reverse()
-                                  .map((smsMessage, index) => (
+                                  ?.map((smsMessage, index) => (
                                     <div key={index}>
                                       <button
                                         type="button"
@@ -1371,7 +1386,7 @@ const SMSSender = () => {
                       <hr className="h-px mt-2 border-gray-300 border-1"></hr>
 
                       <div className="mt-2 max-h-[400px] overflow-y-auto">
-                        {senderResponse.map((sms, index) => (
+                        {senderResponse?.map((sms, index) => (
                           <div key={index} className="">
                             <p>
                               SMS to {sms.phoneNumber} {" => "}
